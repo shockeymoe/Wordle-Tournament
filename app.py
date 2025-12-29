@@ -12,7 +12,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 2. Define the URL to your Google Sheet
 # (Paste your actual Google Sheet link here)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_LONG_ID_HERE/edit"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/WordleData/edit"
 
 # 3. Load Data from Google Sheets
 # Note: We use the 'worksheet' parameter to grab the correct tab
@@ -273,3 +273,4 @@ elif app_mode == "🧠 Solver & Game Interface":
         else:
 
             st.error("No words match your criteria! Check your inputs.")
+
