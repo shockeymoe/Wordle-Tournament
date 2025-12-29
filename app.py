@@ -1,29 +1,43 @@
 import streamlit as st
 import pandas as pd
-import os
-import altair as alt
+from streamlit_gsheets import GSheetsConnection  # <--- NEW IMPORT
 from datetime import date
 from collections import Counter
 
 # --- CONFIGURATION & SETUP ---
 st.set_page_config(page_title="Wordle Tournament & Solver", layout="wide")
 
-SCORES_FILE = 'scores.csv'
-WORDS_FILE = 'word_list.csv'
+# 1. Setup the Connection
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Initialize CSVs if they don't exist
-if not os.path.exists(SCORES_FILE):
-    # Default columns if file is created from scratch
-    pd.DataFrame(columns=['Date', 'Player 1', 'Player 2', 'Player 3', 'Player 4']).to_csv(SCORES_FILE, index=False)
+# 2. Define the URL to your Google Sheet
+# (Paste your actual Google Sheet link here)
+SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_LONG_ID_HERE/edit"
 
-if not os.path.exists(WORDS_FILE):
-    # Create a dummy list if user has no file yet
-    dummy_words = ["APPLE", "CRANE", "GHOST", "SLATE", "TRAIN", "BRICK", "JUMPY", "WALTZ", "OTTER", "AZURE"] 
-    pd.DataFrame(dummy_words, columns=['Word']).to_csv(WORDS_FILE, index=False)
+# 3. Load Data from Google Sheets
+# Note: We use the 'worksheet' parameter to grab the correct tab
 
-# Load Data
-scores_df = pd.read_csv(SCORES_FILE)
-words_df = pd.read_csv(WORDS_FILE)
+try:
+    # Load Scores Tab
+    scores_df = conn.read(spreadsheet=SHEET_URL, worksheet="Scores")
+    
+    # Load Words Tab
+    words_df = conn.read(spreadsheet=SHEET_URL, worksheet="Words")
+    
+    # Handle case where the sheet might be empty or new
+    if scores_df.empty:
+        scores_df = pd.DataFrame(columns=['Date', 'Player 1', 'Player 2', 'Player 3', 'Player 4'])
+    
+    if words_df.empty:
+        # Fallback if the Words tab is empty
+        dummy_words = ["APPLE", "CRANE", "GHOST", "SLATE", "TRAIN", "BRICK", "JUMPY", "WALTZ", "OTTER", "AZURE"] 
+        words_df = pd.DataFrame(dummy_words, columns=['Word'])
+
+except Exception as e:
+    st.error(f"⚠️ Error loading data from Google Sheets: {e}")
+    st.stop()
+
+# 4. Prepare the list (same as before)
 all_words = words_df['Word'].astype(str).str.upper().tolist()
 
 # --- HELPER FUNCTIONS ---
@@ -257,4 +271,5 @@ elif app_mode == "🧠 Solver & Game Interface":
                 st.bar_chart(freq_df.sort_values('Count', ascending=False))
         
         else:
+
             st.error("No words match your criteria! Check your inputs.")
