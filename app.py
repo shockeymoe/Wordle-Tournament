@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from streamlit_gsheets import GSheetsConnection  # <--- NEW IMPORT
 from datetime import date
 from collections import Counter
@@ -273,5 +274,6 @@ elif app_mode == "🧠 Solver & Game Interface":
         else:
 
             st.error("No words match your criteria! Check your inputs.")
+
 
 
