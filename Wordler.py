@@ -137,32 +137,33 @@ if app_mode == "🏆 Scoreboard":
             monthly_avg = monthly_avg.sort_index(ascending=False).reset_index()
             monthly_avg.rename(columns={'Date': 'Month'}, inplace=True)
 
-            col_bar, col_table = st.columns([1, 1])
+            col_raw, col_monthly = st.columns([1, 1])
 
-            with col_bar:
-                st.markdown("**Lifetime Average**")
-                avg_data = melted_df.groupby('Player')['Score'].mean().reset_index()
-                bar_chart = alt.Chart(avg_data).mark_bar().encode(
-                    y=alt.Y('Player:N', title=None), 
-                    x=alt.X('Score:Q', title='Avg Score'),
-                    color=alt.Color('Player:N', legend=None, scale=alt.Scale(domain=domain, range=range_colors)),
-                    tooltip=['Player', 'Score']
-                ).properties(height=250)
-                st.altair_chart(bar_chart, width='stretch')
+            with col_raw:
+                st.markdown("**Raw Data**")
+                # Format precision for the raw data
+                styled_raw = scores_df.sort_values(by='Date', ascending=False).style.format(
+                    {col: "{:.2f}" for col in player_cols}
+                )
+                st.dataframe(
+                    styled_raw, 
+                    hide_index=True,
+                    width='stretch',
+                    height=250
+                )
 
-            with col_table:
+            with col_monthly:
                 st.markdown("**Monthly Averages**")
-                styled_monthly = monthly_avg.style.format(precision=2).set_properties(**{'text-align': 'center'})
+                # Format precision for the monthly averages
+                styled_monthly = monthly_avg.style.format(
+                    {col: "{:.2f}" for col in player_cols}
+                )
                 st.dataframe(
                     styled_monthly, 
                     hide_index=True, 
                     width='stretch',
                     height=250
                 )
-
-            with st.expander("View Raw Data"):
-                st.dataframe(scores_df.sort_values(by='Date', ascending=False), width='stretch')
-
 # ==========================================
 # TAB 2: DAILY SOLVER
 # ==========================================
