@@ -125,32 +125,31 @@ if app_mode == "🏆 Scoreboard":
             monthly_avg = monthly_avg.sort_index(ascending=False).reset_index()
             monthly_avg.rename(columns={'Date': 'Month'}, inplace=True)
 
-            col_raw, col_monthly = st.columns([1, 1])
+            col_bar, col_table = st.columns([1, 1])
 
-            with col_raw:
-                st.markdown("**Raw Data**")
-                # Format to 2 decimal places. 
-                styled_raw = scores_df.sort_values(by='Date', ascending=False).style.format(
-                    {col: "{:.2f}" for col in player_cols}
-                )
-                st.dataframe(
-                    styled_raw, 
-                    hide_index=True,
-                    width='stretch',
-                    height=250
-                )
+            with col_bar:
+                st.markdown("**Lifetime Average**")
+                avg_data = melted_df.groupby('Player')['Score'].mean().reset_index()
+                bar_chart = alt.Chart(avg_data).mark_bar().encode(
+                    y=alt.Y('Player:N', title=None), 
+                    x=alt.X('Score:Q', title='Avg Score'),
+                    color=alt.Color('Player:N', legend=None, scale=alt.Scale(domain=domain, range=range_colors)),
+                    tooltip=['Player', 'Score']
+                ).properties(height=250)
+                st.altair_chart(bar_chart, width='stretch')
 
-            with col_monthly:
+            with col_table:
                 st.markdown("**Monthly Averages**")
-                styled_monthly = monthly_avg.style.format(
-                    {col: "{:.2f}" for col in player_cols}
-                )
+                styled_monthly = monthly_avg.style.format(precision=2).set_properties(**{'text-align': 'center'})
                 st.dataframe(
                     styled_monthly, 
                     hide_index=True, 
                     width='stretch',
                     height=250
                 )
+
+            with st.expander("View Raw Data"):
+                st.dataframe(scores_df.sort_values(by='Date', ascending=False), width='stretch')
 
 # ==========================================
 # TAB 2: DAILY SOLVER
@@ -161,19 +160,22 @@ elif app_mode == "🧠 Solver":
         st.success(st.session_state.last_removed)
         del st.session_state.last_removed
 
-    with st.expander("🛠️ Admin: Remove Today's Answer"):
+    with st.expander("🛠️ Admin: Enter Today's Winning Word"):
         c_rem_1, c_rem_2 = st.columns([3, 1])
         with c_rem_1:
-            todays_word = st.text_input("Winning Word:", key="remove_input", label_visibility="collapsed", placeholder="Enter word to remove...").upper().strip()
+            todays_word = st.text_input("Winning Word:", key="reweight_input", label_visibility="collapsed", placeholder="Type today's answer here...").upper().strip()
         with c_rem_2:
-            if st.button("Remove"):
+            if st.button("Save as Played Word", width='stretch'):
                 if not todays_word:
                     st.warning("Please enter a word.")
                 elif todays_word in all_words:
-                    updated_words_df = words_df[words_df['Word'].str.upper() != todays_word]
-                    success, error_msg = save_dataframe_safely(updated_words_df, WORDS_FILE)
+                    
+                    # Overwrite the 'Weight' column for this specific word to 0.02
+                    words_df.loc[words_df['Word'].astype(str).str.upper() == todays_word, 'Weight'] = 0.02
+                    
+                    success, error_msg = save_dataframe_safely(words_df, WORDS_FILE)
                     if success:
-                        st.session_state.last_removed = f"✅ Verified: '{todays_word}' has been removed from {WORDS_FILE}."
+                        st.session_state.last_removed = f"✅ Verified: '{todays_word}' weight has been updated to 0.02."
                         st.rerun()
                     else:
                         st.error(error_msg)
