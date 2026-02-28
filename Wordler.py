@@ -4,6 +4,8 @@ import os
 import altair as alt
 from datetime import date
 from collections import Counter
+import urllib.request
+import json
 
 # --- CONFIGURATION & SETUP ---
 st.set_page_config(page_title="Wordle Tournament & Solver", layout="wide")
@@ -24,6 +26,17 @@ def save_dataframe_safely(df, filename):
 def reset_solver():
     st.session_state.guesses = []
     st.session_state.solver_input = ""
+
+def fetch_todays_wordle():
+    today_str = date.today().strftime("%Y-%m-%d")
+    url = f"https://www.nytimes.com/svc/wordle/v2/{today_str}.json"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read())
+            return data.get("solution", "").upper()
+    except Exception:
+        return None
 
 # --- LOAD DATA ---
 if not os.path.exists(SCORES_FILE):
@@ -119,7 +132,6 @@ if app_mode == "🏆 Scoreboard":
             
             st.altair_chart(line_chart, width='stretch')
 
-            # Monthly Average Calculation
             monthly_avg = graph_df.set_index('Date').resample('ME').mean()
             monthly_avg.index = monthly_avg.index.strftime('%Y-%m')
             monthly_avg = monthly_avg.sort_index(ascending=False).reset_index()
@@ -160,19 +172,37 @@ elif app_mode == "🧠 Solver":
         st.success(st.session_state.last_removed)
         del st.session_state.last_removed
 
-    with st.expander("🛠️ Admin: Enter Today's Winning Word"):
+    with st.expander("🛠️ Admin: Update Word List"):
+        # The new Auto-Fetch Button
+        if st.button("🤖 Auto-Fetch Today's NYT Answer & Update", width='stretch'):
+            fetched_word = fetch_todays_wordle()
+            if fetched_word:
+                if fetched_word in all_words:
+                    words_df.loc[words_df['Word'].astype(str).str.upper() == fetched_word, 'Weight'] = 0.02
+                    success, error_msg = save_dataframe_safely(words_df, WORDS_FILE)
+                    if success:
+                        st.session_state.last_removed = f"✅ Auto-Success: NYT's answer was **{fetched_word}**. Weight updated to 0.02!"
+                        st.rerun()
+                    else:
+                        st.error(error_msg)
+                else:
+                    st.warning(f"⚠️ Fetched '{fetched_word}', but it wasn't in your list.")
+            else:
+                st.error("❌ Could not reach the NYT database.")
+        
+        st.divider()
+        
+        # The existing manual backup
+        st.caption("Or enter it manually:")
         c_rem_1, c_rem_2 = st.columns([3, 1])
         with c_rem_1:
             todays_word = st.text_input("Winning Word:", key="reweight_input", label_visibility="collapsed", placeholder="Type today's answer here...").upper().strip()
         with c_rem_2:
-            if st.button("Save as Played Word", width='stretch'):
+            if st.button("Save Manual", width='stretch'):
                 if not todays_word:
                     st.warning("Please enter a word.")
                 elif todays_word in all_words:
-                    
-                    # Overwrite the 'Weight' column for this specific word to 0.02
                     words_df.loc[words_df['Word'].astype(str).str.upper() == todays_word, 'Weight'] = 0.02
-                    
                     success, error_msg = save_dataframe_safely(words_df, WORDS_FILE)
                     if success:
                         st.session_state.last_removed = f"✅ Verified: '{todays_word}' weight has been updated to 0.02."
@@ -215,7 +245,6 @@ elif app_mode == "🧠 Solver":
             st.button("🔄 Reset Solver", on_click=reset_solver, width='stretch', key="reset_idle")
 
     with col_right:
-        st.markdown("### Analysis")
         possible_words = all_words.copy()
         
         global_confirmed_present = set()
@@ -257,10 +286,6 @@ elif app_mode == "🧠 Solver":
             
             ranked_df = pd.DataFrame(ranked_data).sort_values(by=["Final Score", "Raw Score"], ascending=False).reset_index(drop=True)
             ranked_df.index += 1 
-
-            m1, m2 = st.columns(2)
-            m1.metric("Viable Words", len(possible_words))
-            m2.metric("Top Final Score", ranked_df.iloc[0]['Final Score'] if not ranked_df.empty else 0)
 
             if st.session_state.guesses:
                 st.caption("History:")
